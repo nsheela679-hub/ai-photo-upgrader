@@ -1,99 +1,77 @@
-import os
 import streamlit as st
-import requests
 from PIL import Image
-from io import BytesIO
-from openai import OpenAI
+import io
+from rembg import remove
 
-# Read API keys from environment (DO NOT hardcode)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-REMOVE_BG_API_KEY = os.getenv("REMOVE_BG_API_KEY")
-
-# Init OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
-
+# ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="AI Photo Upgrader", layout="centered")
 
 st.title("✨ AI Photo Upgrader")
-st.write("Upload a product image and generate a professional studio-style visual.")
+st.write("Upload a product image and generate a studio-style visual")
 
-st.warning("⚠️ Use a clear product image (not a full background scene)")
+st.warning("Use a clear product image (not full background scene)")
 
-uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+# ------------------ UPLOAD ------------------
+uploaded_file = st.file_uploader("📤 Upload Image", type=["jpg", "png", "jpeg"])
 
-# ---- OpenAI: background ideas ----
-if st.button("💡 Generate Background Ideas"):
-    if not OPENAI_API_KEY:
-        st.error("OpenAI API key not set.")
-    else:
-        resp = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{
-                "role": "user",
-                "content": "Suggest 3 short background ideas for product photography (1 line each)."
-            }]
-        )
-        st.info(resp.choices[0].message.content)
-
-# ---- Background choice ----
-background_option = st.selectbox(
-    "Choose Background",
-    ["White Studio", "Office", "Kitchen"]
+# ------------------ BACKGROUND OPTION ------------------
+bg_option = st.selectbox(
+    "🎨 Choose Background",
+    ["White Studio", "Black Studio", "Gray Studio"]
 )
 
-# ---- Main flow ----
+# ------------------ FUNCTIONS ------------------
+
+# Remove background (AI)
+def remove_background(image):
+    return remove(image)
+
+# Add background color
+def add_background(image, bg_option):
+    image = image.convert("RGBA")
+
+    if bg_option == "White Studio":
+        bg_color = (255, 255, 255)
+    elif bg_option == "Black Studio":
+        bg_color = (0, 0, 0)
+    else:
+        bg_color = (200, 200, 200)
+
+    background = Image.new("RGB", image.size, bg_color)
+    background.paste(image, mask=image.split()[3])
+
+    return background
+
+# ------------------ MAIN ------------------
 if uploaded_file:
-    col1, col2 = st.columns(2)
+    image = Image.open(uploaded_file)
 
-    with col1:
-        st.subheader("Original")
-        st.image(uploaded_file, width=260)
+    st.subheader("🖼 Uploaded Image")
+    st.image(image, use_column_width=True)
 
-    if st.button("✨ Enhance Image"):
-        if not REMOVE_BG_API_KEY:
-            st.error("Remove.bg API key not set.")
-        else:
-            with st.spinner("Processing..."):
+    # Remove background
+    with st.spinner("Removing background..."):
+        no_bg = remove_background(image)
 
-                # 1) Remove background via Remove.bg
-                r = requests.post(
-                    "https://api.remove.bg/v1.0/removebg",
-                    files={"image_file": uploaded_file},
-                    data={"size": "auto"},
-                    headers={"X-Api-Key": REMOVE_BG_API_KEY},
-                )
+    st.subheader("✨ Background Removed")
+    st.image(no_bg, use_column_width=True)
 
-                if r.status_code != requests.codes.ok:
-                    st.error("❌ Remove.bg error: " + r.text)
-                else:
-                    # 2) Load cutout
-                    product = Image.open(BytesIO(r.content)).convert("RGBA")
+    # Add selected background
+    final_image = add_background(no_bg, bg_option)
 
-                    # 3) Load selected background
-                    if background_option == "White Studio":
-                        bg = Image.open("backgrounds/white.jpg")
-                    elif background_option == "Office":
-                        bg = Image.open("backgrounds/office.jpg")
-                    else:
-                        bg = Image.open("backgrounds/kitchen.jpg")
+    st.subheader("🎨 Final Image")
+    st.image(final_image, use_column_width=True)
 
-                    bg = bg.resize((600, 600)).convert("RGBA")
+    # Download
+    img_bytes = io.BytesIO()
+    final_image.save(img_bytes, format="PNG")
 
-                    # 4) Resize & paste product
-                    product = product.resize((300, 300))
-                    bg.paste(product, (150, 150), product)
+    st.download_button(
+        "⬇ Download Image",
+        data=img_bytes.getvalue(),
+        file_name="ai_output.png",
+        mime="image/png"
+    )
 
-                    # 5) Show result
-                    with col2:
-                        st.subheader("Enhanced")
-                        st.image(bg, width=260)
-
-                    # 6) Download
-                    buf = BytesIO()
-                    bg.save(buf, format="PNG")
-                    st.download_button(
-                        "⬇ Download Final Image",
-                        buf.getvalue(),
-                        "final.png",
-                        "image/png"
-                    )
+else:
+    st.info("Upload an image to get started 🚀")
