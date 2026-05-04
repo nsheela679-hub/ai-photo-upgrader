@@ -1,15 +1,20 @@
 # AI Photo Upgrader
 
-This app enhances low-quality product images into high-quality visuals using AI.
+This project enhances low-quality product images into high-quality marketing visuals using AI.
 
 ## Features
-- Upload image
-- AI enhancement
-- Download output
+- Upload product image
+- Remove background using AI
+- Add studio/lifestyle backgrounds
+- Generate AI-based background ideas
+- Download final image
 
 ## Tech Stack
 - Streamlit
-- Replicate API
+- Remove.bg API
+- OpenAI API
+- Pillow
 
-## Run
+## Run Locally
+pip install -r requirements.txt
 streamlit run app.py
