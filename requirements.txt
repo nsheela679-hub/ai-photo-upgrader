@@ -3,4 +3,4 @@ Pillow
 numpy
 rembg
 onnxruntime
-openai
+
